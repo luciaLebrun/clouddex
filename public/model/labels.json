@@ -1,16 +1,15 @@
 {
-  "_comment": "Output label order of the trained model. This MUST match the class index order used during training (training/README.md). Replace this file when you swap in a new model. The strings must match the `id` values in src/data/genera.ts.",
   "labels": [
-    "cirrus",
-    "cirrostratus",
-    "cirrocumulus",
     "altocumulus",
     "altostratus",
-    "cumulus",
+    "cirrocumulus",
+    "cirrostratus",
+    "cirrus",
+    "contrail",
     "cumulonimbus",
+    "cumulus",
     "nimbostratus",
     "stratocumulus",
-    "stratus",
-    "contrail"
+    "stratus"
   ]
 }
