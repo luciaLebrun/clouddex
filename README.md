@@ -1,5 +1,8 @@
 # Clouddex ☁️ — a Pokedex for clouds
 
+**Live:** https://lucialebrun.github.io/clouddex/ — auto-deployed from `main`
+via GitHub Actions ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)).
+
 Take a photo of the sky and the app identifies the **cloud genus** on-device,
 then lets you **collect all 10 WMO cloud types** like a Pokedex. It's a
 Progressive Web App: installable to a phone's home screen, works offline, no
@@ -33,8 +36,12 @@ need HTTPS — use a free preview deploy (below) or `vite preview` over a tunnel
 
 ## Deploy (free)
 
-Any static host works — Vercel, Netlify, GitHub Pages, Cloudflare Pages.
-Build command `npm run build`, output dir `dist`. All free tiers.
+Already wired for **GitHub Pages**: every push to `main` runs the workflow in
+`.github/workflows/deploy.yml`, which builds and publishes `dist/`. The Vite
+`base` is set to `/clouddex/` for production builds to match the Pages subpath
+(see `vite.config.ts`). Any other static host (Vercel, Netlify, Cloudflare
+Pages) also works — build `npm run build`, output `dist` (set `base` back to
+`/` if hosting at a domain root).
 
 ## Project map
 
