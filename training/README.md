@@ -1,8 +1,16 @@
 # Training the Clouddex model
 
 The app loads a TensorFlow.js classifier from `public/model/`. Until one exists,
-the app runs in **demo mode** (fake predictions, clearly labelled). There are
-two ways to produce a real model — start with the fast path.
+the app runs in **demo mode** (fake predictions, clearly labelled). Pick a path:
+
+- **Train in the cloud (recommended, free GPU)** — open
+  [`clouddex_colab.ipynb`](clouddex_colab.ipynb) in Google Colab, set the runtime
+  to GPU, run all cells, provide the CCSN dataset when prompted, and download the
+  converted model. No local install needed. Steps to upload to Colab: go to
+  <https://colab.research.google.com> → File → Upload notebook → pick this file
+  (or push the repo to GitHub and open it from the GitHub tab).
+- **Train locally** — the Python pipeline below (`run.sh`).
+- **No code at all** — Google Teachable Machine (fast path below).
 
 ## Fast path — Google Teachable Machine (no code, ~1 hour)
 
