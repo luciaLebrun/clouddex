@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# Training artifacts (large)
+training/.venv
+training/data
+training/saved_model
+__pycache__

@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/cameracapture.tsx","./src/components/clouddex.tsx","./src/components/genusdetail.tsx","./src/components/resultcard.tsx","./src/data/genera.ts","./src/ml/model.ts","./src/ml/predict.ts","./src/ml/preprocess.ts","./src/store/collection.ts","./vite-env.d.ts"],"version":"5.9.3"}
