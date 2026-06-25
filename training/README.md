@@ -29,16 +29,26 @@ two ways to produce a real model — start with the fast path.
 
 ```bash
 cd training
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt   # TF 2.16 + tensorflowjs (arm64-ok)
 
-# Arrange CCSN as data/<class_name>/*.jpg (one folder per genus), then:
-python train.py --data ./data --epochs 15
-./convert.sh        # exports tfjs graph model + labels into ../public/model/
+# 1. Put the CCSN dataset under ./data/ (see "Dataset" below).
+# 2. One command does the rest — train, convert, place model in ../public/model/:
+./run.sh                  # or: ./run.sh --epochs 20
 ```
 
-`train.py` writes `labels.json` in the model's true output order and `convert.sh`
-copies it next to the model, so the app stays in sync automatically.
+`run.sh` auto-renames CCSN's 2-letter folders (Ci, Cu, …) to the full class ids
+the app expects, runs `train.py`, then `convert.sh`. `train.py` writes
+`labels.json` in the model's true output order and `convert.sh` copies it next
+to the model, so the app stays in sync automatically. After it finishes:
+
+```bash
+cd .. && npm run dev          # confirm the "demo model" badge is gone
+git add public/model && git commit -m "Add trained model" && git push
+```
+
+The push triggers the GitHub Actions deploy, so the live site updates with the
+real model.
 
 ## Dataset — CCSN (Cirrus Cumulus Stratus Nimbus Database)
 
@@ -47,13 +57,31 @@ copies it next to the model, so the app stays in sync automatically.
   bonus contrail class).
 - Published with: J. Zhang et al., "CloudNet: Ground-Based Cloud Classification
   With Deep Convolutional Neural Network", *Geophysical Research Letters*, 2018.
-- Find it via the paper's GitHub release or Harvard Dataverse (search
-  "CCSN Database cloud").
+- **Where to get it** (verify the live link yourself before downloading):
+  - GitHub mirror commonly used: search GitHub for **"CCSN Database"**
+    (e.g. the `upuil/CCSN-Database` repository) and download/clone it.
+  - Or Harvard Dataverse / the paper's supplementary data — search
+    **"CCSN Database cloud classification"**.
 - **License**: distributed for **academic / research use**. Fine for this POC.
   Verify the terms before redistributing trained weights commercially.
-- The folder names you create become the class labels — name them to match the
-  `id` values in `src/data/genera.ts`. CCSN ships with 2-letter codes (Ci, Cu…);
-  rename the folders to the full ids (`cirrus`, `cumulus`, …) before training.
+- **Where to put it:** extract so each class is its own folder under
+  `training/data/`. `run.sh` accepts either CCSN's original 2-letter codes
+  (`Ci`, `Cu`, …) or the full ids and will rename them for you:
+
+  ```
+  training/data/
+    Ci/  *.jpg     (or cirrus/)
+    Cs/  ...        cirrostratus/
+    Cc/  ...        cirrocumulus/
+    Ac/  ...        altocumulus/
+    As/  ...        altostratus/
+    Cu/  ...        cumulus/
+    Cb/  ...        cumulonimbus/
+    Ns/  ...        nimbostratus/
+    Sc/  ...        stratocumulus/
+    St/  ...        stratus/
+    Ct/  ...        contrail/
+  ```
 
 ### Class imbalance
 High clouds (cirrus family) have fewer samples. `train.py` already applies

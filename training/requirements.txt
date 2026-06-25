@@ -1,3 +1,6 @@
-# Training + export dependencies (Python 3.10–3.11 recommended).
-tensorflow==2.15.0
-tensorflowjs==4.17.0
+# Training + export dependencies.
+# Pinned for macOS Apple Silicon (arm64) + Python 3.10/3.11.
+# TensorFlow ships native arm64 macOS wheels from 2.16+; tensorflowjs 4.22
+# pairs with TF 2.16 and provides the `tensorflowjs_converter` CLI.
+tensorflow==2.16.2
+tensorflowjs==4.22.0
