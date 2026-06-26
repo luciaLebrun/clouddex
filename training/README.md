@@ -115,9 +115,12 @@ cd training
 ```
 
 It's idempotent/resumable (skips genera already at target and files already on
-disk) and depends only on the stdlib + `certifi`. Review the folders by eye and
-delete obvious mislabels/non-sky shots before training — Commons categories are
-curated by humans but not perfect.
+disk), re-encodes every download to a clean RGB JPEG (so images are always
+`tf.image.decode_image`-safe), and is polite to the API — backs off and honors
+`Retry-After` on HTTP 429/503, with `--delay` (default 0.3s) between downloads.
+Needs `certifi` + `Pillow` (both in requirements.txt; preinstalled on Colab).
+Review the folders by eye and delete obvious mislabels/non-sky shots before
+training — Commons categories are curated by humans but not perfect.
 
 **Using harvested data on Colab:** `training/data/` is gitignored (don't commit
 ~hundreds of MB of images). Either zip it and upload to Google Drive, or just run

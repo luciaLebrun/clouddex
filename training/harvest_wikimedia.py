@@ -71,32 +71,60 @@ DENY = ("-nc", " nc", "noncommercial", "-nd", " nd", "noderiv",
         "gfdl", "fair use", "non-free", "nonfree")
 
 IMG_EXT = (".jpg", ".jpeg", ".png")
+MAX_TRIES = 6
+
+
+def backoff(err, attempt, cap=90):
+    """Seconds to wait before a retry: honor Retry-After, else exponential."""
+    ra = getattr(err, "headers", None) and err.headers.get("Retry-After")
+    if ra:
+        try:
+            return min(cap, float(ra))
+        except ValueError:
+            pass
+    return min(cap, 2 ** attempt)
+
+
+def fetch(url=None, data=None, timeout=30):
+    """urlopen().read() with retries on 429/503 (rate-limit) honoring Retry-After."""
+    last = None
+    for attempt in range(MAX_TRIES):
+        req = urllib.request.Request(url, data=data, headers={"User-Agent": UA})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout, context=SSL_CTX) as r:
+                return r.read()
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in (429, 503) and attempt < MAX_TRIES - 1:
+                wait = backoff(e, attempt)
+                print(f"  rate-limited ({e.code}); backing off {wait:.0f}s", flush=True)
+                time.sleep(wait)
+                continue
+            raise
+        except Exception as e:
+            last = e
+            if attempt == MAX_TRIES - 1:
+                raise
+            time.sleep(1 + attempt)
+    raise last
 
 
 def api_get(params, post=False):
-    """Query the Commons API as JSON, honoring maxlag with a couple of retries.
+    """Query the Commons API as JSON, honoring maxlag and rate limits.
 
     Use post=True for requests with many/long titles (GET hits HTTP 414).
     """
     params = {**params, "format": "json", "maxlag": "5"}
-    for attempt in range(4):
+    for attempt in range(MAX_TRIES):
         if post:
-            body = urllib.parse.urlencode(params).encode()
-            req = urllib.request.Request(API, data=body, headers={"User-Agent": UA})
+            raw = fetch(API, data=urllib.parse.urlencode(params).encode())
         else:
-            req = urllib.request.Request(API + "?" + urllib.parse.urlencode(params),
-                                         headers={"User-Agent": UA})
-        try:
-            with urllib.request.urlopen(req, timeout=30, context=SSL_CTX) as r:
-                data = json.load(r)
-            if "error" in data and data["error"].get("code") == "maxlag":
-                time.sleep(2 + attempt * 2)
-                continue
-            return data
-        except Exception as e:
-            if attempt == 3:
-                raise
-            time.sleep(1 + attempt)
+            raw = fetch(API + "?" + urllib.parse.urlencode(params))
+        data = json.loads(raw)
+        if "error" in data and data["error"].get("code") == "maxlag":
+            time.sleep(2 + attempt * 2)
+            continue
+        return data
     return {}
 
 
@@ -203,9 +231,20 @@ def imageinfo(file_titles, thumb_width):
 
 
 def download(url, dest):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=60, context=SSL_CTX) as r, open(dest, "wb") as f:
-        f.write(r.read())
+    """Fetch the image and re-encode to a clean RGB JPEG.
+
+    Commons files are heterogeneous (CMYK/progressive JPEGs, alpha PNGs, EXIF
+    rotation, occasional truncated bytes). Re-encoding via PIL guarantees the
+    result is decodable by tf.image.decode_image during training — so harvested
+    images don't depend on the notebook's separate CCSN-cleaning pass, which runs
+    before enrichment. Raises on undecodable bytes so the caller skips the image.
+    """
+    from PIL import Image, ImageOps
+    import io
+    raw = fetch(url, timeout=60)  # retries + honors Retry-After on 429/503
+    img = Image.open(io.BytesIO(raw))
+    img = ImageOps.exif_transpose(img).convert("RGB")  # bake in rotation, drop alpha
+    img.save(dest, "JPEG", quality=90)
 
 
 def safe_name(title):
@@ -222,6 +261,8 @@ def main():
     ap.add_argument("--thumb-width", type=int, default=720,
                     help="download a scaled JPEG/PNG this many px wide (saves space)")
     ap.add_argument("--max-depth", type=int, default=2)
+    ap.add_argument("--delay", type=float, default=0.3,
+                    help="seconds to pause between image downloads (politeness)")
     ap.add_argument("--genera", default="",
                     help="comma-separated subset; default = all 11")
     ap.add_argument("--add", action="store_true",
@@ -238,10 +279,13 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     manifest = os.path.join(args.out, "_attributions.csv")
     have = set()
+    harvested = {}  # genus -> count already in the manifest (for --add resume)
     new_manifest = not os.path.exists(manifest) or os.path.getsize(manifest) == 0
     if not new_manifest:
         with open(manifest, newline="") as f:
-            have = {row["file"] for row in csv.DictReader(f)}
+            for row in csv.DictReader(f):
+                have.add(row["file"])
+                harvested[row["genus"]] = harvested.get(row["genus"], 0) + 1
     mf = open(manifest, "a", newline="")
     writer = csv.writer(mf)
     if new_manifest:
@@ -254,8 +298,14 @@ def main():
         existing = len([f for f in os.listdir(gdir)
                         if f.lower().endswith(IMG_EXT)])
         if args.add:
-            need = args.per_genus
-            print(f"\n=== {genus}: have {existing}, adding up to {need} new ===", flush=True)
+            # Resume toward the same target: subtract Commons images already logged
+            # for this genus (the manifest persists across re-runs after a failure).
+            need = max(0, args.per_genus - harvested.get(genus, 0))
+            print(f"\n=== {genus}: {harvested.get(genus, 0)} already harvested, "
+                  f"adding up to {need} more (folder has {existing}) ===", flush=True)
+            if need <= 0:
+                print("  enrichment target already met, skipping")
+                continue
         else:
             need = args.per_genus - existing
             print(f"\n=== {genus}: have {existing}, target {args.per_genus} ===", flush=True)
@@ -284,9 +334,8 @@ def main():
             src = ii.get("thumburl") or ii.get("url")
             if not src:
                 continue
-            ext = ".png" if ii.get("mime") == "image/png" else ".jpg"
-            fname = safe_name(title)
-            fname = os.path.splitext(fname)[0] + ext
+            # download() re-encodes everything to JPEG, so the output is always .jpg
+            fname = os.path.splitext(safe_name(title))[0] + ".jpg"
             if fname in have:
                 continue
             dest = os.path.join(gdir, fname)
@@ -296,7 +345,7 @@ def main():
             try:
                 download(src, dest)
             except Exception as e:
-                print("  download failed:", title, e)
+                print("  skipped (undecodable/download error):", title, e)
                 continue
             author = strip_html(ii["extmetadata"].get("Artist", {}).get("value", "")) or "Unknown"
             page = ii.get("descriptionshorturl") or ii.get("descriptionurl") or title
@@ -306,7 +355,7 @@ def main():
             kept += 1
             if kept % 25 == 0:
                 print(f"  ...{kept}/{need}", flush=True)
-            time.sleep(0.05)
+            time.sleep(args.delay)
         grand += kept
         print(f"  kept {kept} new images for {genus}")
 
