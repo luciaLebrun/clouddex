@@ -46,9 +46,11 @@ python3 -m venv .venv
 ```
 
 `run.sh` auto-renames CCSN's 2-letter folders (Ci, Cu, …) to the full class ids
-the app expects, runs `train.py`, then `convert.sh`. `train.py` writes
-`labels.json` in the model's true output order and `convert.sh` copies it next
-to the model, so the app stays in sync automatically. After it finishes:
+the app expects, then runs `train.py`. `train.py` trains, exports a TensorFlow.js
+**Layers** model straight into `../public/model/`, and writes `labels.json` there
+in the model's true output order — so the app stays in sync automatically. (The
+old `convert.sh` SavedModel→graph-model step is deprecated; `train.py` does the
+TF.js export itself.) After it finishes:
 
 ```bash
 cd .. && npm run dev          # confirm the "demo model" badge is gone
@@ -95,3 +97,29 @@ real model.
 High clouds (cirrus family) have fewer samples. `train.py` already applies
 class weighting and data augmentation. Expect lower accuracy on subtle high
 clouds — that's an inherent difficulty, not a bug. More data is the main lever.
+
+## Enrich the dataset — real sky photos from Wikimedia Commons
+
+`harvest_wikimedia.py` adds real, freely-licensed photos per genus to balance out
+CCSN. It walks each WMO genus' Commons category tree (staying on-label — never
+pulling a `stratocumulus` subcategory into `cumulus`, etc.), keeps only
+**CC0 / public-domain / CC-BY / CC-BY-SA** images (no NC/ND/GFDL), downloads
+720px-wide copies into `training/data/<genus>/`, and records every author +
+license + source URL to `training/data/_attributions.csv` (feed it into the
+top-level `ATTRIBUTIONS.md`).
+
+```bash
+cd training
+.venv/bin/python harvest_wikimedia.py --per-genus 175        # all 11 genera
+.venv/bin/python harvest_wikimedia.py --genera cirrus,cirrostratus --per-genus 100
+```
+
+It's idempotent/resumable (skips genera already at target and files already on
+disk) and depends only on the stdlib + `certifi`. Review the folders by eye and
+delete obvious mislabels/non-sky shots before training — Commons categories are
+curated by humans but not perfect.
+
+**Using harvested data on Colab:** `training/data/` is gitignored (don't commit
+~hundreds of MB of images). Either zip it and upload to Google Drive, or just run
+`harvest_wikimedia.py` *inside* a Colab cell to download straight into
+`/content/data` alongside CCSN before training.
