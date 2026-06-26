@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Convert the trained Keras SavedModel into a TensorFlow.js graph model that the
-# Clouddex app loads from public/model/.
-#
-#   pip install tensorflowjs
-#   ./convert.sh
-#
+# DEPRECATED — do not use. This produced a TF.js *graph* model from a Keras
+# SavedModel, but the app loads a *Layers* model via loadLayersModel, and the
+# Keras-3 SavedModel export breaks tensorflowjs ("Identity is not in graph").
+# train.py now exports the TF.js Layers model directly into ../public/model/.
+# Kept only for reference. See train.py's header for the full rationale.
+echo "convert.sh is deprecated — train.py exports the TF.js model directly." >&2
+exit 1
+
 set -euo pipefail
 
 SAVED_MODEL="${1:-./saved_model}"

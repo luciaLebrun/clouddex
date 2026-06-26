@@ -35,14 +35,11 @@ done
 
 echo "Classes found:"; ls -1 data | sed 's/^/  - /'
 
-# --- Train ---
-echo "==> Training"
+# --- Train + export TF.js Layers model straight into ../public/model ---
+# (train.py writes the model itself now — no separate convert step. The old
+#  SavedModel -> graph_model convert.sh path is deprecated; see train.py header.)
+echo "==> Training + exporting to TensorFlow.js"
 $PY train.py --data ./data "$@"
-
-# --- Convert to TF.js (uses tensorflowjs_converter from the venv) ---
-echo "==> Converting to TensorFlow.js"
-export PATH="$(pwd)/.venv/bin:$PATH"
-./convert.sh
 
 echo
 echo "Done. Model written to ../public/model/."

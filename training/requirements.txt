@@ -3,4 +3,6 @@
 # TensorFlow ships native arm64 macOS wheels from 2.16+; tensorflowjs 4.22
 # pairs with TF 2.16 and provides the `tensorflowjs_converter` CLI.
 tensorflow==2.16.2
+tf-keras==2.16.0      # Keras 2 — train.py needs this (Keras 3 breaks TF.js export)
 tensorflowjs==4.22.0
+pillow               # image repair in train.py's prepare()
