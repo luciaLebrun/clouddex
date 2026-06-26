@@ -169,14 +169,27 @@ def main():
     ])
     model.compile(optimizer=keras.optimizers.Adam(1e-3),
                   loss="categorical_crossentropy", metrics=["accuracy"])
-    model.fit(train_ds, validation_data=val_ds, epochs=15, class_weight=class_weight)
-
-    base.trainable = True
-    for layer in base.layers[:-30]:
-        layer.trainable = False
-    model.compile(optimizer=keras.optimizers.Adam(1e-5),
-                  loss="categorical_crossentropy", metrics=["accuracy"])
+    # Warm up the head briefly (backbone frozen) before unfreezing.
     model.fit(train_ds, validation_data=val_ds, epochs=8, class_weight=class_weight)
+
+    # Fine-tune the FULL backbone at a low LR with early stopping + LR decay.
+    # (Unfreezing only the top 30 layers for 8 epochs underfit — train acc ~0.58.)
+    # BatchNorm stays frozen so it keeps ImageNet stats (stabler on a small set).
+    base.trainable = True
+    for layer in base.layers:
+        if isinstance(layer, layers.BatchNormalization):
+            layer.trainable = False
+    model.compile(optimizer=keras.optimizers.Adam(1e-4),
+                  loss="categorical_crossentropy", metrics=["accuracy"])
+    callbacks = [
+        keras.callbacks.EarlyStopping(monitor="val_accuracy", patience=8,
+                                      restore_best_weights=True),
+        keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5,
+                                          patience=3, min_lr=1e-6, verbose=1),
+    ]
+    history = model.fit(train_ds, validation_data=val_ds, epochs=50,
+                        class_weight=class_weight, callbacks=callbacks)
+    print("BEST val_accuracy:", round(max(history.history["val_accuracy"]), 4))
 
     # Export a TF.js Layers model (no SavedModel freezing).
     import tensorflowjs as tfjs

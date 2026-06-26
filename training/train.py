@@ -128,8 +128,10 @@ def prepare(data_dir: str) -> list[str]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="./data")
-    ap.add_argument("--epochs", type=int, default=15)
-    ap.add_argument("--fine-tune-epochs", type=int, default=8)
+    ap.add_argument("--epochs", type=int, default=8,
+                    help="head warm-up epochs (backbone frozen)")
+    ap.add_argument("--fine-tune-epochs", type=int, default=50,
+                    help="max full-backbone fine-tune epochs (early-stopped on val)")
     ap.add_argument("--out", default="../public/model")
     args = ap.parse_args()
 
@@ -189,17 +191,28 @@ def main():
     ])
     model.compile(optimizer=keras.optimizers.Adam(1e-3),
                   loss="categorical_crossentropy", metrics=["accuracy"])
+    # Warm up the head briefly (backbone frozen) before unfreezing.
     model.fit(train_ds, validation_data=val_ds, epochs=args.epochs,
               class_weight=class_weight)
 
-    # Fine-tune the top of the backbone for a few epochs at a low LR.
+    # Fine-tune the FULL backbone at a low LR with early stopping + LR decay.
+    # (Unfreezing only the top 30 layers for a few epochs underfit — train acc ~0.58.)
+    # BatchNorm stays frozen so it keeps ImageNet stats (stabler on a small set).
     base.trainable = True
-    for layer in base.layers[:-30]:
-        layer.trainable = False
-    model.compile(optimizer=keras.optimizers.Adam(1e-5),
+    for layer in base.layers:
+        if isinstance(layer, layers.BatchNormalization):
+            layer.trainable = False
+    model.compile(optimizer=keras.optimizers.Adam(1e-4),
                   loss="categorical_crossentropy", metrics=["accuracy"])
-    model.fit(train_ds, validation_data=val_ds, epochs=args.fine_tune_epochs,
-              class_weight=class_weight)
+    callbacks = [
+        keras.callbacks.EarlyStopping(monitor="val_accuracy", patience=8,
+                                      restore_best_weights=True),
+        keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5,
+                                          patience=3, min_lr=1e-6, verbose=1),
+    ]
+    history = model.fit(train_ds, validation_data=val_ds, epochs=args.fine_tune_epochs,
+                        class_weight=class_weight, callbacks=callbacks)
+    print("BEST val_accuracy:", round(max(history.history["val_accuracy"]), 4))
 
     # Export a TF.js Layers model straight into the app (no SavedModel freezing).
     import tensorflowjs as tfjs
