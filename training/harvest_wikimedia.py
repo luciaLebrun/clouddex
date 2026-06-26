@@ -224,6 +224,10 @@ def main():
     ap.add_argument("--max-depth", type=int, default=2)
     ap.add_argument("--genera", default="",
                     help="comma-separated subset; default = all 11")
+    ap.add_argument("--add", action="store_true",
+                    help="additive mode: pull up to --per-genus NEW images per genus "
+                         "regardless of how many already exist (e.g. on top of CCSN). "
+                         "Default tops folders UP TO --per-genus total.")
     args = ap.parse_args()
 
     genera = [g.strip() for g in args.genera.split(",") if g.strip()] or ALL_GENERA
@@ -249,11 +253,15 @@ def main():
         os.makedirs(gdir, exist_ok=True)
         existing = len([f for f in os.listdir(gdir)
                         if f.lower().endswith(IMG_EXT)])
-        need = args.per_genus - existing
-        print(f"\n=== {genus}: have {existing}, target {args.per_genus} ===", flush=True)
-        if need <= 0:
-            print("  already satisfied, skipping")
-            continue
+        if args.add:
+            need = args.per_genus
+            print(f"\n=== {genus}: have {existing}, adding up to {need} new ===", flush=True)
+        else:
+            need = args.per_genus - existing
+            print(f"\n=== {genus}: have {existing}, target {args.per_genus} ===", flush=True)
+            if need <= 0:
+                print("  already satisfied, skipping")
+                continue
 
         titles = collect_file_titles(genus, args.max_depth)
         print(f"  candidate files in category tree: {len(titles)}", flush=True)
