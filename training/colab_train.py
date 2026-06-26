@@ -192,6 +192,12 @@ def main():
     print("BEST val_accuracy:", round(max(history.history["val_accuracy"]), 4))
 
     # Export a TF.js Layers model (no SavedModel freezing).
+    # Compat shim: newer NumPy (>=1.24) removed np.object/np.bool aliases that some
+    # tensorflowjs builds reference at import time. Restore them before importing.
+    import numpy as np
+    for _n, _t in (("object", object), ("bool", bool), ("int", int), ("float", float)):
+        if not hasattr(np, _n):
+            setattr(np, _n, _t)
     import tensorflowjs as tfjs
     shutil.rmtree(OUT_DIR, ignore_errors=True)
     try:
