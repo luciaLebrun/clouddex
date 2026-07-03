@@ -1,5 +1,5 @@
 import { GENUS_BY_ID, ALTITUDE_LABELS } from "../data/genera";
-import { LOW_CONFIDENCE, type PredictResult } from "../ml/predict";
+import { LOW_CONFIDENCE, type PredictResult } from "../ml/types";
 
 interface Props {
   photo: string;
@@ -25,7 +25,7 @@ export default function ResultCard({ photo, result, isNew, onRetake }: Props) {
 
       {lowConfidence ? (
         <div className="result-body">
-          <h2>Not sure about this one 🤔</h2>
+          <h2>Not sure about this one</h2>
           <p className="muted">
             The model isn't confident. Try a clearer shot of the sky — fill the
             frame with cloud, avoid buildings, trees and the sun.
@@ -50,7 +50,7 @@ export default function ResultCard({ photo, result, isNew, onRetake }: Props) {
             <p className="weather">
               <strong>Weather:</strong> {genus.weather}
             </p>
-            <p className="fact">💡 {genus.fact}</p>
+            <p className="fact">{genus.fact}</p>
           </div>
         )
       )}

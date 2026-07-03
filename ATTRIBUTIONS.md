@@ -1,3 +1,11 @@
+# Attributions
+
+## Icons — Lucide
+
+The inline SVG icon paths in `src/components/Icons.tsx` (cloud, camera, book,
+close) are from [Lucide](https://lucide.dev), used under the
+[ISC License](https://lucide.dev/license).
+
 # Image attributions
 
 Reference images in `public/genera/` come from two sources.

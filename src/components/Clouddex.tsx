@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ALL_ENTRIES, assetUrl } from "../data/genera";
 import type { Collection } from "../store/collection";
 import GenusDetail from "./GenusDetail";
+import { CloudIcon } from "./Icons";
 
 interface Props {
   collection: Collection;
@@ -27,6 +28,11 @@ export default function Clouddex({ collection }: Props) {
             <button
               key={g.id}
               className={`dex-cell ${caught ? "caught" : "locked"}`}
+              aria-label={
+                caught
+                  ? `${g.name}, number ${i + 1}, caught`
+                  : `Number ${i + 1}, not yet caught`
+              }
               onClick={() => setOpenId(g.id)}
               style={
                 caught && g.image
@@ -36,7 +42,11 @@ export default function Clouddex({ collection }: Props) {
             >
               <span className="dex-num">#{String(i + 1).padStart(2, "0")}</span>
               <span className="dex-name">{caught ? g.name : "???"}</span>
-              {!caught && <span className="dex-silhouette">☁</span>}
+              {!caught && (
+                <span className="dex-silhouette" aria-hidden="true">
+                  <CloudIcon size={40} />
+                </span>
+              )}
             </button>
           );
         })}

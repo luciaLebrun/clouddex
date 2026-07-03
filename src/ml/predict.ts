@@ -1,23 +1,9 @@
 import * as tf from "@tensorflow/tfjs";
 import { getModel } from "./model";
 import { imageToTensor } from "./preprocess";
+import type { Prediction, PredictResult } from "./types";
 
-export interface Prediction {
-  /** Class id (matches a genus id in src/data/genera.ts). */
-  id: string;
-  /** Probability 0..1. */
-  score: number;
-}
-
-export interface PredictResult {
-  /** Sorted descending by score. */
-  top: Prediction[];
-  /** True when no real model is loaded and results are faked. */
-  demo: boolean;
-}
-
-/** Confidence below this is shown as "not sure / try again". */
-export const LOW_CONFIDENCE = 0.4;
+export { LOW_CONFIDENCE, type Prediction, type PredictResult } from "./types";
 
 function softmaxToPredictions(scores: number[], labels: string[]): Prediction[] {
   return labels

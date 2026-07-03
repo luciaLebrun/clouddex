@@ -9,3 +9,17 @@ training/.venv
 training/data
 training/saved_model
 __pycache__
+
+CLAUDE.md
+.claude
+
+# impeccable-ignore-start
+# Ephemeral output, runtime state, and per-dev overrides.
+# Unanchored: .impeccable may sit at the repo root or under a nested
+# workspace (apps/web/.impeccable/...); anchored patterns would miss it.
+# Shared artifacts stay tracked: config.json, live/config.json,
+# design.json, critique/*.md.
+.impeccable
+DESIGN.md
+PRODUCT.md
+# impeccable-ignore-end

@@ -16,14 +16,15 @@ export default defineConfig(({ command }) => ({
       // after first load.
       workbox: {
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
-        globPatterns: ["**/*.{js,css,html,png,svg,json,bin}"],
+        // jpg included so the Clouddex grid images work offline too.
+        globPatterns: ["**/*.{js,css,html,png,svg,json,bin,jpg}"],
       },
       manifest: {
         name: "Clouddex — Cloud Pokedex",
         short_name: "Clouddex",
         description:
           "Take a photo of the sky and identify the cloud type. Collect all 10 cloud genera.",
-        theme_color: "#1d2b53",
+        theme_color: "#0a1026",
         background_color: "#0a1026",
         display: "standalone",
         orientation: "portrait",

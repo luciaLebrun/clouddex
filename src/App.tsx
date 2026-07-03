@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import CameraCapture from "./components/CameraCapture";
 import ResultCard from "./components/ResultCard";
 import Clouddex from "./components/Clouddex";
-import { classify, LOW_CONFIDENCE, type PredictResult } from "./ml/predict";
-import { getModel } from "./ml/model";
+import { LOW_CONFIDENCE, type PredictResult } from "./ml/types";
+import { GENUS_BY_ID } from "./data/genera";
+import { BookIcon, CameraIcon, CloudIcon } from "./components/Icons";
 import {
   loadCollection,
   recordCatch,
@@ -22,21 +23,30 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("scan");
   const [busy, setBusy] = useState(false);
   const [scan, setScan] = useState<ScanState | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [announce, setAnnounce] = useState("");
   const [collection, setCollection] = useState<Collection>(() =>
     loadCollection(),
   );
   const [demoModel, setDemoModel] = useState(false);
 
-  // Kick off model load (and warmup) as soon as the app mounts.
+  // Load the ML chunk (tfjs + model + warmup) in the background right after
+  // first paint. Dynamic import keeps the ~2 MB of TensorFlow.js out of the
+  // initial bundle so the shell renders instantly.
   useEffect(() => {
-    getModel()
+    import("./ml/model")
+      .then((mod) => mod.getModel())
       .then((m) => setDemoModel(m.demo))
       .catch(() => setDemoModel(true));
   }, []);
 
   async function handleCapture(img: HTMLImageElement, dataUrl: string) {
     setBusy(true);
+    setScanError(null);
+    setAnnounce("Identifying cloud…");
     try {
+      // Already warm in the module cache by now (kicked off on mount).
+      const { classify } = await import("./ml/predict");
       const result = await classify(img);
       const top = result.top[0];
       let isNew = false;
@@ -47,6 +57,20 @@ export default function App() {
         isNew = r.isNew;
       }
       setScan({ photo: dataUrl, result, isNew });
+      if (!top || top.score < LOW_CONFIDENCE) {
+        setAnnounce("Not sure about this one. Try a clearer shot of the sky.");
+      } else {
+        const name = GENUS_BY_ID[top.id]?.name ?? top.id;
+        const pct = Math.round(top.score * 100);
+        setAnnounce(
+          `${isNew ? "New catch! " : ""}Identified ${name}, ${pct} percent confidence.`,
+        );
+      }
+    } catch {
+      setScanError(
+        "Something went wrong while identifying that photo. Try again with another shot.",
+      );
+      setAnnounce("");
     } finally {
       setBusy(false);
     }
@@ -56,7 +80,10 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <h1>
-          <span className="logo">☁</span> Clouddex
+          <span className="logo">
+            <CloudIcon size={22} />
+          </span>
+          Clouddex
         </h1>
         {demoModel && <span className="demo-pill">demo model</span>}
       </header>
@@ -71,25 +98,37 @@ export default function App() {
               onRetake={() => setScan(null)}
             />
           ) : (
-            <CameraCapture onCapture={handleCapture} busy={busy} />
+            <CameraCapture
+              onCapture={handleCapture}
+              busy={busy}
+              error={scanError}
+            />
           )
         ) : (
           <Clouddex collection={collection} />
         )}
       </main>
 
+      <div className="sr-only" role="status">
+        {announce}
+      </div>
+
       <nav className="tabbar">
         <button
           className={tab === "scan" ? "active" : ""}
+          aria-current={tab === "scan" ? "page" : undefined}
           onClick={() => setTab("scan")}
         >
-          📷 Scan
+          <CameraIcon />
+          Scan
         </button>
         <button
           className={tab === "dex" ? "active" : ""}
+          aria-current={tab === "dex" ? "page" : undefined}
           onClick={() => setTab("dex")}
         >
-          📖 Clouddex
+          <BookIcon />
+          Clouddex
         </button>
       </nav>
     </div>
