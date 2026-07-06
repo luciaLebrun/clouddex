@@ -1,4 +1,11 @@
-import * as tf from "@tensorflow/tfjs";
+import * as tf from "@tensorflow/tfjs-core";
+// Register the WebGL backend (fast path) and the pure-CPU backend (fallback
+// when WebGL is unavailable). Importing the scoped packages instead of the
+// "@tensorflow/tfjs" umbrella keeps tfjs-data & co. out of the bundle.
+import "@tensorflow/tfjs-backend-webgl";
+import "@tensorflow/tfjs-backend-cpu";
+import { loadLayersModel, type LayersModel } from "@tensorflow/tfjs-layers";
+import { loadGraphModel, type GraphModel } from "@tensorflow/tfjs-converter";
 import { INPUT_SIZE } from "./preprocess";
 
 // ---------------------------------------------------------------------------
@@ -15,7 +22,7 @@ import { INPUT_SIZE } from "./preprocess";
 // ---------------------------------------------------------------------------
 
 export interface LoadedModel {
-  model: tf.LayersModel | tf.GraphModel | null;
+  model: LayersModel | GraphModel | null;
   labels: string[];
   demo: boolean;
 }
@@ -37,14 +44,14 @@ async function loadLabels(): Promise<string[]> {
   return [];
 }
 
-async function tryLoadModel(): Promise<tf.LayersModel | tf.GraphModel | null> {
+async function tryLoadModel(): Promise<LayersModel | GraphModel | null> {
   // Teachable Machine and Keras `tfjs` exports are LayersModels; the
   // tensorflowjs graph converter produces GraphModels. Try both.
   try {
-    return await tf.loadLayersModel(MODEL_URL);
+    return await loadLayersModel(MODEL_URL);
   } catch {
     try {
-      return await tf.loadGraphModel(MODEL_URL);
+      return await loadGraphModel(MODEL_URL);
     } catch {
       return null;
     }
@@ -71,11 +78,12 @@ export function getModel(): Promise<LoadedModel> {
       return { model: null, labels, demo: true };
     }
 
-    // Warm up so the first real prediction isn't slow.
+    // Warm up so the first real prediction isn't slow. `await data()` instead
+    // of `dataSync()` keeps the main thread free during the GPU readback.
     try {
       const warm = tf.zeros([1, INPUT_SIZE, INPUT_SIZE, 3]);
-      const out = (model as tf.LayersModel).predict(warm) as tf.Tensor;
-      out.dataSync();
+      const out = (model as LayersModel).predict(warm) as tf.Tensor;
+      await out.data();
       tf.dispose([warm, out]);
     } catch {
       /* warmup is best-effort */

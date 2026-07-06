@@ -7,6 +7,22 @@ import { VitePWA } from "vite-plugin-pwa";
 // so production builds need the "/clouddex/" base. Dev stays at "/".
 export default defineConfig(({ command }) => ({
   base: command === "build" ? "/clouddex/" : "/",
+  build: {
+    rollupOptions: {
+      output: {
+        // Keep big, rarely-changing vendor code in its own chunks so app-code
+        // edits don't invalidate ~1.9 MB of precached JS on every deploy.
+        // The tfjs chunk stays lazy: it's only reachable via the dynamic
+        // import of src/ml/model.ts.
+        manualChunks(id: string) {
+          if (id.includes("node_modules/@tensorflow/")) return "tfjs";
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
+            return "react";
+          }
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

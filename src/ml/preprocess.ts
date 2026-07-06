@@ -1,4 +1,4 @@
-import * as tf from "@tensorflow/tfjs";
+import * as tf from "@tensorflow/tfjs-core";
 
 // ---------------------------------------------------------------------------
 // SHARED preprocessing constants.
@@ -27,11 +27,13 @@ export function imageToTensor(
   source: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement | ImageBitmap,
 ): tf.Tensor4D {
   return tf.tidy(() => {
-    let img = tf.browser.fromPixels(source).toFloat();
+    let img: tf.Tensor3D = tf.cast(tf.browser.fromPixels(source), "float32");
     // Resize with bilinear interpolation to the model's expected size.
     img = tf.image.resizeBilinear(img, [INPUT_SIZE, INPUT_SIZE]);
     const normalized =
-      NORM_MODE === "neg1to1" ? img.div(127.5).sub(1) : img.div(255);
-    return normalized.expandDims(0) as tf.Tensor4D;
+      NORM_MODE === "neg1to1"
+        ? tf.sub(tf.div(img, 127.5), 1)
+        : tf.div(img, 255);
+    return tf.expandDims(normalized, 0) as tf.Tensor4D;
   });
 }

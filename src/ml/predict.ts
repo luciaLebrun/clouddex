@@ -1,4 +1,4 @@
-import * as tf from "@tensorflow/tfjs";
+import * as tf from "@tensorflow/tfjs-core";
 import { getModel } from "./model";
 import { imageToTensor } from "./preprocess";
 import type { Prediction, PredictResult } from "./types";
@@ -38,8 +38,9 @@ export async function classify(
   }
 
   const input = imageToTensor(source);
+  let logits: tf.Tensor | undefined;
   try {
-    const logits = model.predict(input) as tf.Tensor;
+    logits = model.predict(input) as tf.Tensor;
     // Teachable Machine models already output probabilities; a raw Keras head
     // may output logits. Applying softmax to a probability vector is harmless
     // enough for ranking, but to be safe we only softmax if values fall
@@ -48,14 +49,17 @@ export async function classify(
     const looksLikeProbs =
       data.every((v) => v >= 0 && v <= 1) &&
       Math.abs(data.reduce((a, b) => a + b, 0) - 1) < 0.05;
-    const probs = looksLikeProbs
-      ? data
-      : Array.from(await tf.softmax(logits as tf.Tensor1D).data());
-    tf.dispose(logits);
+    let probs = data;
+    if (!looksLikeProbs) {
+      const softmaxed = tf.softmax(logits as tf.Tensor1D);
+      probs = Array.from(await softmaxed.data());
+      tf.dispose(softmaxed);
+    }
 
     const ranked = softmaxToPredictions(probs, labels).slice(0, topK);
     return { top: ranked, demo: false };
   } finally {
     tf.dispose(input);
+    if (logits) tf.dispose(logits);
   }
 }
