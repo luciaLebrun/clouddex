@@ -3,14 +3,88 @@
 The app loads a TensorFlow.js classifier from `public/model/`. Until one exists,
 the app runs in **demo mode** (fake predictions, clearly labelled). Pick a path:
 
-- **Train in the cloud (recommended, free GPU)** — open
-  [`clouddex_colab.ipynb`](clouddex_colab.ipynb) in Google Colab, set the runtime
-  to GPU, run all cells, provide the CCSN dataset when prompted, and download the
-  converted model. No local install needed. Steps to upload to Colab: go to
-  <https://colab.research.google.com> → File → Upload notebook → pick this file
-  (or push the repo to GitHub and open it from the GitHub tab).
-- **Train locally** — the Python pipeline below (`run.sh`).
+- **Colab, one click (recommended, free GPU)** — see below. Open the notebook,
+  Runtime → **Run all**, wait, download the model. No uploads, no credentials,
+  no local install.
+- **Train locally** — the Python pipeline below (`run.sh`); simpler baseline
+  recipe, useful without a GPU quota.
 - **No code at all** — Google Teachable Machine (fast path below).
+
+## Recommended path — Colab, one click
+
+1. Open [`clouddex_colab.ipynb`](clouddex_colab.ipynb) in Google Colab
+   (<https://colab.research.google.com> → File → Upload notebook → pick this
+   file, or open it from the GitHub tab). The notebook requests a **T4 GPU**
+   runtime by itself.
+2. Runtime → **Run all**. That's the only step. The notebook:
+   - installs a **pinned known-good environment** (TF 2.16.2 + `tf_keras` +
+     `tensorflowjs` 4.22 + NumPy 1.26 — the combo where training *and* the
+     TF.js export both work, no mid-notebook restart);
+   - **auto-downloads CCSN** (~95 MB, CC0) from a GitHub mirror with the
+     official Harvard Dataverse as fallback — no Kaggle keys, no form;
+   - **enriches** each genus with freely-licensed Wikimedia Commons photos
+     (`harvest_wikimedia.py`, attribution CSV included) and **removes
+     near-duplicates** before the train/val split;
+   - trains **EfficientNetV2-B0** two-stage (frozen-backbone head warm-up,
+     then full fine-tune with BatchNorm frozen) with AdamW, warmup + cosine
+     LR, label smoothing, mixup, class-weighted loss, augmentation, mixed
+     precision, best-checkpoint saving and early stopping;
+   - prints a **per-class report + confusion matrix** (with flip TTA);
+   - exports a **float16-quantized TF.js Layers model (~12 MB)** and downloads
+     `clouddex_model.zip` in your browser.
+3. Unzip `clouddex_model.zip` (`model.json`, `group1-shard*.bin`,
+   `labels.json`) into the repo's **`public/model/`**, then:
+
+   ```bash
+   git add public/model && git commit -m "Add trained model" && git push
+   ```
+
+   The push triggers the GitHub Actions deploy; the live site loses the
+   "demo model" badge.
+
+Total ≈ 60–90 min on a free T4. All knobs (backbone, epochs, augmentation,
+Commons images per genus, float16 quantization, …) live in the single
+**CONFIG cell** at the top of the notebook. Set `DRIVE_BACKUP = True` there to
+persist the best checkpoint to Google Drive (one extra auth click) so a full VM
+reset doesn't lose training; otherwise re-running **Run all** after a disconnect
+resumes from the on-disk checkpoint and the idempotent dataset downloads.
+
+### Why EfficientNetV2-B0 + Keras 2 (verified, don't "simplify")
+
+- **Keras 2 (`tf_keras`), not Keras 3.** Keras 3 `model.export()` SavedModels
+  break the TF.js converter ("Identity is not in graph").
+- **EfficientNetV2-B0 with `include_preprocessing=False`.** It takes `[-1, 1]`
+  input directly — matching `src/ml/preprocess.ts` — and converts to a TF.js
+  **Layers** model that was confirmed to load and predict with the app's
+  `@tensorflow/tfjs-layers`. MobileNetV3 does **not** convert: its hard-swish
+  serializes as a `TFOpLambda` layer TF.js can't deserialize. `mobilenetv2` is
+  kept as a fallback backbone in the CONFIG cell.
+- **Normalize in the data pipeline, not the model.** Putting a Rescaling /
+  `preprocess_input` layer in the graph and normalizing again in
+  `preprocess.ts` double-normalizes — the #1 silent-failure mode.
+- **NumPy 1.26 pin.** NumPy ≥1.24 removed `np.object`/`np.bool` aliases some
+  `tensorflowjs` builds reference at import; the export cells also restore them
+  defensively.
+
+### Accuracy: recipe and realistic expectation
+
+Published CCSN results cluster at **88–91%** for 11-class CNNs — CloudNet ~89%
+([Zhang et al., 2018](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2018GL077787)),
+CloudDenseNet 90.7%
+([PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC10537665/)), ALGA-DenseNet
+97.3% with heavy augmentation
+([PLOS One](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0333999)).
+[Kopeć, 2024](https://rmets.onlinelibrary.wiley.com/doi/full/10.1002/qj.4865)
+finds ConvNeXt ≳ EfficientNet ≳ ResNet (ViT best) for ground-based clouds.
+Many of these numbers use leaky random splits over a dataset with near
+duplicates, so they are optimistic. This notebook **de-duplicates before the
+split**, which lowers but truthifies the number. With EfficientNetV2-B0, the
+two-stage fine-tune, strong augmentation + mixup + label smoothing, class
+weights, and Commons enrichment, **≥80% honest validation accuracy is a
+realistic target** (the old MobileNetV2 recipe plateaued at ~60–62%). The
+[TF.js Rescaling-layer issue](https://github.com/tensorflow/tfjs/issues/3728)
+is why the backbone is built with `include_preprocessing=False`. CCSN itself is
+[Harvard Dataverse, CC0](https://doi.org/10.7910/DVN/CADDPD).
 
 ## Fast path — Google Teachable Machine (no code, ~1 hour)
 
@@ -33,7 +107,7 @@ the app runs in **demo mode** (fake predictions, clearly labelled). Pick a path:
 > with `tf.loadLayersModel` automatically. Its preprocessing (224×224, [-1,1])
 > already matches `src/ml/preprocess.ts`.
 
-## Better path — Python / Keras (higher accuracy on 10 genera)
+## Better path — Python / Keras (local, no GPU quota needed)
 
 ```bash
 cd training
@@ -46,11 +120,12 @@ python3 -m venv .venv
 ```
 
 `run.sh` auto-renames CCSN's 2-letter folders (Ci, Cu, …) to the full class ids
-the app expects, then runs `train.py`. `train.py` trains, exports a TensorFlow.js
-**Layers** model straight into `../public/model/`, and writes `labels.json` there
-in the model's true output order — so the app stays in sync automatically. (The
-old `convert.sh` SavedModel→graph-model step is deprecated; `train.py` does the
-TF.js export itself.) After it finishes:
+the app expects, then runs `train.py`. `train.py` trains a MobileNetV2 baseline,
+exports a TensorFlow.js **Layers** model straight into `../public/model/`, and
+writes `labels.json` there in the model's true output order — so the app stays
+in sync automatically. (This local path uses the simpler baseline recipe; the
+higher-accuracy EfficientNetV2 recipe lives in the Colab notebook above.) After
+it finishes:
 
 ```bash
 cd .. && npm run dev          # confirm the "demo model" badge is gone
@@ -67,16 +142,12 @@ real model.
   bonus contrail class).
 - Published with: J. Zhang et al., "CloudNet: Ground-Based Cloud Classification
   With Deep Convolutional Neural Network", *Geophysical Research Letters*, 2018.
-- **Where to get it** (verify the live link yourself before downloading):
-  - GitHub mirror commonly used: search GitHub for **"CCSN Database"**
-    (e.g. the `upuil/CCSN-Database` repository) and download/clone it.
-  - Or Harvard Dataverse / the paper's supplementary data — search
-    **"CCSN Database cloud classification"**.
-- **License**: distributed for **academic / research use**. Fine for this POC.
-  Verify the terms before redistributing trained weights commercially.
-- **Where to put it:** extract so each class is its own folder under
-  `training/data/`. `run.sh` accepts either CCSN's original 2-letter codes
-  (`Ci`, `Cu`, …) or the full ids and will rename them for you:
+- **License**: CC0 1.0 (public domain) on Harvard Dataverse. Fine for this app.
+- **The Colab notebook downloads it for you** (GitHub mirror →
+  <https://doi.org/10.7910/DVN/CADDPD> fallback). For the local path, fetch it
+  manually and extract so each class is its own folder under `training/data/`.
+  `run.sh` accepts either CCSN's original 2-letter codes (`Ci`, `Cu`, …) or the
+  full ids and will rename them for you:
 
   ```
   training/data/
@@ -94,19 +165,19 @@ real model.
   ```
 
 ### Class imbalance
-High clouds (cirrus family) have fewer samples. `train.py` already applies
-class weighting and data augmentation. Expect lower accuracy on subtle high
-clouds — that's an inherent difficulty, not a bug. More data is the main lever.
+High clouds (cirrus family) have fewer samples. Both the Colab notebook and
+`train.py` apply class weighting and augmentation. The Colab recipe additionally
+uses mixup, label smoothing, and Commons enrichment to help the sparse classes.
 
 ## Enrich the dataset — real sky photos from Wikimedia Commons
 
-`harvest_wikimedia.py` adds real, freely-licensed photos per genus to balance out
-CCSN. It walks each WMO genus' Commons category tree (staying on-label — never
-pulling a `stratocumulus` subcategory into `cumulus`, etc.), keeps only
-**CC0 / public-domain / CC-BY / CC-BY-SA** images (no NC/ND/GFDL), downloads
-720px-wide copies into `training/data/<genus>/`, and records every author +
-license + source URL to `training/data/_attributions.csv` (feed it into the
-top-level `ATTRIBUTIONS.md`).
+`harvest_wikimedia.py` adds real, freely-licensed photos per genus to balance
+out CCSN (the Colab notebook runs it for you). It walks each WMO genus' Commons
+category tree (staying on-label — never pulling a `stratocumulus` subcategory
+into `cumulus`, etc.), keeps only **CC0 / public-domain / CC-BY / CC-BY-SA**
+images (no NC/ND/GFDL), downloads 720px-wide copies into `training/data/<genus>/`,
+and records every author + license + source URL to `training/data/_attributions.csv`
+(feed it into the top-level `ATTRIBUTIONS.md`).
 
 ```bash
 cd training
@@ -115,14 +186,9 @@ cd training
 ```
 
 It's idempotent/resumable (skips genera already at target and files already on
-disk), re-encodes every download to a clean RGB JPEG (so images are always
-`tf.image.decode_image`-safe), and is polite to the API — backs off and honors
-`Retry-After` on HTTP 429/503, with `--delay` (default 0.3s) between downloads.
-Needs `certifi` + `Pillow` (both in requirements.txt; preinstalled on Colab).
-Review the folders by eye and delete obvious mislabels/non-sky shots before
-training — Commons categories are curated by humans but not perfect.
-
-**Using harvested data on Colab:** `training/data/` is gitignored (don't commit
-~hundreds of MB of images). Either zip it and upload to Google Drive, or just run
-`harvest_wikimedia.py` *inside* a Colab cell to download straight into
-`/content/data` alongside CCSN before training.
+disk), re-encodes every download to a clean RGB JPEG, and is polite to the API —
+backs off and honors `Retry-After` on HTTP 429/503, with `--delay` (default
+0.3s) between downloads. Needs `certifi` + `Pillow` (both in requirements.txt;
+preinstalled on Colab). Review the folders by eye and delete obvious
+mislabels/non-sky shots before training — Commons categories are curated by
+humans but not perfect.
