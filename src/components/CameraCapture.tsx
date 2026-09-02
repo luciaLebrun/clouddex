@@ -1,12 +1,18 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-interface Props {
+type Props = Readonly<{
   /** Called with a loaded <img> element ready for classification. */
   onCapture: (img: HTMLImageElement, dataUrl: string) => void;
   busy?: boolean;
   /** Error from the parent (e.g. classification failure) to display here. */
   error?: string | null;
-}
+  /** True while the model chunk is still downloading / warming up. */
+  modelLoading?: boolean;
+  /** True when no real model loaded and identifications are sample data. */
+  demo?: boolean;
+  /** Focus the shutter on mount (set when returning from a result). */
+  focusOnMount?: boolean;
+}>;
 
 /**
  * Camera capture via a file input with `capture="environment"`. This is the
@@ -19,6 +25,9 @@ interface Props {
  * ~500px and the classifier resizes to 224px, so cap the longest edge here.
  */
 const MAX_PHOTO_DIM = 1280;
+
+/** After this long in the busy state, reassure the user it's still working. */
+const SLOW_SCAN_MS = 8000;
 
 function downscale(
   img: HTMLImageElement,
@@ -46,10 +55,34 @@ function downscale(
   small.onerror = () => done(img, dataUrl);
   small.src = smallUrl;
 }
-export default function CameraCapture({ onCapture, busy, error }: Props) {
+export default function CameraCapture({
+  onCapture,
+  busy,
+  error,
+  modelLoading,
+  demo,
+  focusOnMount,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const shutterRef = useRef<HTMLButtonElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [slow, setSlow] = useState(false);
   const shownError = localError ?? error;
+
+  useEffect(() => {
+    if (focusOnMount) shutterRef.current?.focus();
+  }, [focusOnMount]);
+
+  // A long wait is almost always the one-time model download + warmup on the
+  // first scan of a session. Surface a reassurance rather than a silent spin.
+  useEffect(() => {
+    if (!busy) {
+      setSlow(false);
+      return;
+    }
+    const t = setTimeout(() => setSlow(true), SLOW_SCAN_MS);
+    return () => clearTimeout(t);
+  }, [busy]);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     setLocalError(null);
@@ -72,6 +105,9 @@ export default function CameraCapture({ onCapture, busy, error }: Props) {
     e.target.value = "";
   }
 
+  let label = "Scan the sky";
+  if (busy) label = modelLoading ? "Warming up the field guide…" : "Identifying…";
+
   return (
     <div className="capture">
       <input
@@ -83,19 +119,31 @@ export default function CameraCapture({ onCapture, busy, error }: Props) {
         hidden
       />
       <button
-        className="shutter"
+        ref={shutterRef}
+        className={busy ? "shutter busy" : "shutter"}
         onClick={() => inputRef.current?.click()}
         disabled={busy}
+        aria-busy={busy || undefined}
         aria-label="Take a photo of the sky"
       >
         <span className="shutter-ring" />
-        <span className="shutter-label">
-          {busy ? "Identifying…" : "Scan the sky"}
-        </span>
+        <span className="shutter-label">{label}</span>
       </button>
       <p className="capture-hint">
         Point at the clouds and snap a photo — or pick one from your gallery.
       </p>
+      {slow && (
+        <p className="capture-note" role="status">
+          Still working — the first scan of a session takes a little longer while
+          the field guide loads.
+        </p>
+      )}
+      {demo && !busy && (
+        <p className="capture-note">
+          Demo mode: identifications are sample data and aren't saved to your
+          collection.
+        </p>
+      )}
       {shownError && (
         <p className="error" role="alert">
           {shownError}
