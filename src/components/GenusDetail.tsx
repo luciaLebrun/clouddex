@@ -3,18 +3,25 @@ import { ALTITUDE_LABELS, assetUrl, type Genus } from "../data/genera";
 import type { CaughtEntry } from "../store/collection";
 import { CloseIcon } from "./Icons";
 
-interface Props {
+type Props = Readonly<{
   genus: Genus;
   caught?: CaughtEntry;
+  /** The user's own catch photo, when they have one stored. */
+  photo?: string;
   onClose: () => void;
-}
+}>;
 
 /**
  * Bottom sheet built on the native <dialog> element: modal focus trapping,
  * Escape-to-close and focus restore to the opener all come from the platform.
  */
-export default function GenusDetail({ genus, caught, onClose }: Props) {
+export default function GenusDetail({ genus, caught, photo, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
+
+  // The user's own catch photo wins; the reference image is the fallback for
+  // older catches and for genera not yet caught.
+  const heroImage =
+    photo ?? (genus.image ? assetUrl(genus.image) : undefined);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -43,11 +50,7 @@ export default function GenusDetail({ genus, caught, onClose }: Props) {
       </button>
       <div
         className="sheet-hero"
-        style={
-          genus.image
-            ? { backgroundImage: `url(${assetUrl(genus.image)})` }
-            : undefined
-        }
+        style={heroImage ? { backgroundImage: `url(${heroImage})` } : undefined}
       >
         {!caught && <span className="locked-overlay">Not yet caught</span>}
       </div>
@@ -56,8 +59,8 @@ export default function GenusDetail({ genus, caught, onClose }: Props) {
           <h2 id="genus-title">{genus.name}</h2>
           <span className="abbr-chip">{genus.abbr}</span>
         </div>
-        <p className="latin">
-          {genus.latin} · {ALTITUDE_LABELS[genus.altitude]} · {genus.heightText}
+        <p className="meta">
+          {ALTITUDE_LABELS[genus.altitude]} · {genus.heightText}
         </p>
         <p>{genus.appearance}</p>
         <p className="weather">

@@ -5,6 +5,10 @@
   --panel-2: #243163;
   --ink: #eef2ff;
   --muted: #9fb0d8;
+
+  /* Dim ink that still clears bright-sunlight legibility — for primary guidance
+     copy that should sit just below Moonlight, not down at muted. */
+  --ink-soft: #c3cef0;
   --accent: #5ea0ff;
   --accent-2: #7ce0ff;
   --good: #4be39a;
@@ -19,6 +23,12 @@
   /* Ice Cyan hairline for structural borders; dark scrim for overlays. */
   --hairline: rgb(124 224 255 / 12%);
   --scrim: rgb(4 8 20 / 70%);
+
+  /* Semantic stacking order (small app: local raised content, then controls
+     that float over a sheet's own hero). The detail sheet is a native <dialog>
+     and rides the top layer above all of this. */
+  --z-raised: 1;
+  --z-overlay-control: 2;
   --radius: 16px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -170,6 +180,18 @@ body {
   animation: spin 14s linear infinite;
 }
 
+/* Busy: the dome speeds up and its ring brightens to a near-solid cyan, so the
+   working state reads differently from idle even at a glance (and even with
+   motion reduced, where the spin is off — see the reduced-motion block). */
+.shutter.busy {
+  opacity: 1;
+}
+
+.shutter.busy .shutter-ring {
+  animation-duration: 3s;
+  border-color: rgb(124 224 255 / 85%);
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -183,9 +205,16 @@ body {
 }
 
 .capture-hint {
-  color: var(--muted);
+  color: var(--ink-soft);
   max-width: 280px;
   line-height: 1.5;
+}
+
+.capture-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  max-width: 300px;
 }
 
 .error {
@@ -229,6 +258,17 @@ body {
   background: var(--good);
   color: var(--ink-on-good);
   box-shadow: 0 0 18px rgb(75 227 154 / 60%);
+
+  /* One quiet arrival — a short settle on an ease-out curve, no bounce. The
+     catch is meant to feel like closing a field journal, not a slot machine. */
+  animation: badge-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes badge-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .badge.demo {
@@ -263,22 +303,32 @@ body {
   flex-shrink: 0;
 }
 
-.latin {
+.result-revisit {
+  margin: 0;
+}
+
+/* WMO abbreviation + altitude band. Not italic: the Latin genus name is
+   identical to the display name for all 10 genera, so it's dropped from the
+   line rather than repeated under the heading. */
+.meta {
   color: var(--muted);
   margin: 4px 0 14px;
-  font-style: italic;
 }
 
 .weather {
   margin-top: 10px;
 }
 
+/* The field-guide fact: a tonal inset with a faint cyan hairline. Body copy
+   stays Moonlight — a full sentence set in Ice Cyan is past "highlight" and
+   harder to read in sunlight. */
 .fact {
   margin-top: 12px;
   background: var(--panel-2);
+  border: 1px solid var(--hairline);
   border-radius: 12px;
   padding: 12px;
-  color: var(--accent-2);
+  color: var(--ink);
 }
 
 .muted {
@@ -290,46 +340,27 @@ body {
   font-size: 0.8125rem;
 }
 
-/* Alternatives */
-.alts {
-  background: var(--panel);
-  border-radius: var(--radius);
-  padding: 14px 18px;
-}
-
-.alts-label {
-  margin: 0 0 10px;
-  font-size: 0.8125rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+.caught-note {
+  margin-top: 14px;
   color: var(--muted);
-}
-
-.alt-row {
-  display: grid;
-  grid-template-columns: 110px 1fr 42px;
-  align-items: center;
-  gap: 10px;
-  margin: 8px 0;
   font-size: 0.875rem;
 }
 
-.alt-bar {
-  background: var(--bg);
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
+.also {
+  margin-top: 12px;
 }
 
-.alt-bar-fill {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-}
-
-.alt-score {
-  text-align: right;
-  color: var(--muted);
+/* Text button that reads as a link — the low-key route from a fresh catch to
+   the collection, and out of the empty state. */
+.linklike {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--accent-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 /* Buttons */
@@ -400,18 +431,34 @@ body {
   color: var(--muted);
 }
 
+.dex-empty {
+  margin: 0 0 16px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.dex-empty p {
+  margin: 0 0 8px;
+}
+
 .dex-num {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   font-size: 0.6875rem;
   color: var(--muted);
 }
 
 .dex-name {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   font-size: 0.8125rem;
   font-weight: 600;
+
+  /* Genus names are finite and known — wrap the long ones ("Cumulonimbus")
+     onto a second line rather than clipping them with an ellipsis. */
+  line-height: 1.15;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .dex-silhouette {
@@ -456,7 +503,7 @@ body {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 2;
+  z-index: var(--z-overlay-control);
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -560,14 +607,6 @@ body {
   outline-offset: 4px;
 }
 
-/* Long-name resilience (translations, future genus names) */
-.alt-name,
-.dex-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
 
 /* Fine-pointer feedback: hover states only where hover exists, so touch
    devices never get sticky hover styles. */
@@ -651,16 +690,16 @@ body {
   .tabbar,
   .capture,
   .boot-status,
-  .alt-bar,
   .primary,
+  .linklike,
   .sheet-close {
     display: none;
   }
 
   .result-body,
-  .fact,
-  .alts {
+  .fact {
     background: none;
+    border: none;
     color: #000;
   }
 }
@@ -671,7 +710,16 @@ body {
     animation: none;
   }
 
+  /* No spin to lean on, so the busy ring goes solid + bright instead. */
+  .shutter.busy .shutter-ring {
+    border-style: solid;
+  }
+
   .sheet {
+    animation: none;
+  }
+
+  .badge.new {
     animation: none;
   }
 

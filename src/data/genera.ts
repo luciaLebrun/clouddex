@@ -173,12 +173,24 @@ export const CONTRAIL: Genus = {
   image: "/genera/contrail.jpg",
 };
 
-/** All collectible entries, keyed by id for quick lookup. */
-export const ALL_ENTRIES: Genus[] = [...GENERA, CONTRAIL];
+/**
+ * The 10 collectible WMO genera — the Clouddex proper. Contrail is deliberately
+ * NOT here: it isn't a cloud genus, so it never takes a grid cell or counts
+ * toward "collect all 10". It stays a valid *classification* outcome (see
+ * ALL_CLASSES / isCollectible) so the result card can name it honestly.
+ */
+export const ALL_ENTRIES: Genus[] = GENERA;
+
+/** Every class the model can output: the 10 genera plus the non-genus contrail. */
+export const ALL_CLASSES: Genus[] = [...GENERA, CONTRAIL];
 
 export const GENUS_BY_ID: Record<string, Genus> = Object.fromEntries(
-  ALL_ENTRIES.map((g) => [g.id, g]),
+  ALL_CLASSES.map((g) => [g.id, g]),
 );
+
+/** True only for the 10 collectible genera; false for contrail and unknown ids. */
+export const isCollectible = (id: string): boolean =>
+  GENERA.some((g) => g.id === id);
 
 export const ALTITUDE_LABELS: Record<AltitudeBand, string> = {
   high: "High cloud",
