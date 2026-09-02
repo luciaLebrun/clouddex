@@ -7,12 +7,81 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#0a1026" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
     <title>Clouddex — Cloud Pokedex</title>
+    <meta
+      name="description"
+      content="Photograph the sky and identify the cloud genus on-device — then collect all 10 WMO cloud types. A free, offline, installable PWA. No account, no backend."
+    />
+    <link rel="canonical" href="https://lucialebrun.github.io/clouddex/" />
+    <meta name="robots" content="index, follow" />
+
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Clouddex" />
+    <meta property="og:title" content="Clouddex — a Pokédex for clouds" />
+    <meta
+      property="og:description"
+      content="Photograph the sky, identify the cloud genus on-device, and collect all 10 WMO cloud types. Free, offline, installable."
+    />
+    <meta property="og:url" content="https://lucialebrun.github.io/clouddex/" />
+    <meta property="og:image" content="https://lucialebrun.github.io/clouddex/icons/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Clouddex — a Pokédex for clouds" />
+    <meta
+      name="twitter:description"
+      content="Photograph the sky, identify the cloud genus on-device, and collect all 10 WMO cloud types. Free, offline, installable."
+    />
+    <meta name="twitter:image" content="https://lucialebrun.github.io/clouddex/icons/icon-512.png" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="boot" aria-busy="true">
+        <h1>Clouddex</h1>
+        <p>
+          Photograph the sky and identify the cloud genus on-device, then collect
+          all 10 WMO cloud types. A free, offline, installable field guide — no
+          account, no backend.
+        </p>
+        <p class="boot-status">Loading the field guide…</p>
+        <h2>The 10 WMO cloud genera</h2>
+        <ul>
+          <li>Cirrus</li>
+          <li>Cirrocumulus</li>
+          <li>Cirrostratus</li>
+          <li>Altocumulus</li>
+          <li>Altostratus</li>
+          <li>Nimbostratus</li>
+          <li>Stratocumulus</li>
+          <li>Stratus</li>
+          <li>Cumulus</li>
+          <li>Cumulonimbus</li>
+        </ul>
+        <noscript>
+          Clouddex needs JavaScript to identify clouds from your photos.
+        </noscript>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Clouddex",
+        "url": "https://lucialebrun.github.io/clouddex/",
+        "description": "Photograph the sky and identify the cloud genus on-device, then collect all 10 WMO cloud types. A free, offline, installable Progressive Web App.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any (Progressive Web App)",
+        "browserRequirements": "Requires JavaScript and a modern browser",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
   </body>
 </html>
