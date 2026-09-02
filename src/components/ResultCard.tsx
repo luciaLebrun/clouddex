@@ -16,7 +16,7 @@ export default function ResultCard({ photo, result, isNew, onRetake }: Props) {
   return (
     <div className="result">
       <div className="result-photo">
-        <img src={photo} alt="Your sky photo" />
+        <img src={photo} alt="The sky you scanned" width={1280} height={960} />
         {result.demo && <span className="badge demo">DEMO MODEL</span>}
         {!result.demo && isNew && !lowConfidence && (
           <span className="badge new">NEW!</span>

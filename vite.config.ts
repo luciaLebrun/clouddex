@@ -27,6 +27,8 @@ export default defineConfig(({ command }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // Load the SW registration script with defer so it never blocks parsing.
+      injectRegister: "script-defer",
       includeAssets: ["icons/*.png"],
       // Cache the (potentially large) model files so the app works offline
       // after first load.
