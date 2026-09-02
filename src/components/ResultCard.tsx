@@ -16,21 +16,20 @@ type Props = Readonly<{
   onViewCollection: () => void;
 }>;
 
-/** "Cumulus" / "Cumulus · Cu · Low cloud" reads as a stutter — the Latin genus
- *  name is identical to the display name for all 10. Show the Latin word only
- *  when it actually differs, then the WMO abbreviation and altitude band. */
+/** The subtitle under the genus name: the altitude band, in plain words. The
+ *  Latin genus name is identical to the display name for all 10 genera, so it
+ *  is shown only if a future entry's Latin name actually differs; the WMO
+ *  abbreviation lives on the detail sheet, not on this celebratory card. */
 function metaLine(genus: {
   name: string;
   latin: string;
-  abbr: string;
   altitude: keyof typeof ALTITUDE_LABELS;
 }): string {
-  const parts: string[] = [];
+  const band = ALTITUDE_LABELS[genus.altitude];
   if (genus.latin && genus.latin !== genus.name && genus.latin !== "—") {
-    parts.push(genus.latin);
+    return `${genus.latin} · ${band}`;
   }
-  parts.push(genus.abbr, ALTITUDE_LABELS[genus.altitude]);
-  return parts.join(" · ");
+  return band;
 }
 
 export default function ResultCard({
@@ -93,9 +92,8 @@ export default function ResultCard({
           </h2>
           <p className="meta">{metaLine(genus)}</p>
           <p>
-            A jet's condensation trail — ice crystals from engine exhaust, not
-            one of the 10 cloud genera. Nothing to add to the guide, but a good
-            eye.
+            A jet's condensation trail, not one of the 10 cloud genera — so
+            there's nothing to add to your collection. Still, a sharp eye.
           </p>
           <p className="fact">{genus.fact}</p>
         </div>

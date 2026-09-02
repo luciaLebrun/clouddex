@@ -10,7 +10,15 @@ import {
   recordCatch,
   type Collection,
 } from "./store/collection";
-import { getAllCatchPhotos, putCatchPhoto } from "./store/photos";
+import {
+  getAllCatchPhotos,
+  makeThumbnail,
+  putCatchPhoto,
+  type CatchPhoto,
+} from "./store/photos";
+
+/** After this long mid-scan, reassure the user it's still working. */
+const SLOW_SCAN_MS = 8000;
 
 type Tab = "scan" | "dex";
 type ModelStatus = "loading" | "ready" | "demo";
@@ -29,10 +37,11 @@ export default function App() {
   const [announce, setAnnounce] = useState("");
   const [everScanned, setEverScanned] = useState(false);
   const [resultRevisited, setResultRevisited] = useState(false);
+  const [slowScan, setSlowScan] = useState(false);
   const [collection, setCollection] = useState<Collection>(() =>
     loadCollection(),
   );
-  const [photos, setPhotos] = useState<Record<string, string>>({});
+  const [photos, setPhotos] = useState<Record<string, CatchPhoto>>({});
   const [modelStatus, setModelStatus] = useState<ModelStatus>("loading");
   const demoModel = modelStatus === "demo";
 
@@ -65,6 +74,24 @@ export default function App() {
     };
   }, []);
 
+  // A long wait is almost always the one-time model download + warmup on the
+  // first scan of a session. One timer, one announcement — the capture screen
+  // reads `slowScan` for its visual note (it is not a second live region).
+  useEffect(() => {
+    if (!busy) {
+      setSlowScan(false);
+      return;
+    }
+    const t = setTimeout(() => setSlowScan(true), SLOW_SCAN_MS);
+    return () => clearTimeout(t);
+  }, [busy]);
+
+  useEffect(() => {
+    if (slowScan) {
+      setAnnounce("Still working on it — the first scan of a session takes longer.");
+    }
+  }, [slowScan]);
+
   async function handleCapture(img: HTMLImageElement, dataUrl: string) {
     setBusy(true);
     setScanError(null);
@@ -88,15 +115,25 @@ export default function App() {
         const r = recordCatch(top.id, top.score);
         setCollection(r.collection);
         isNew = r.isNew;
-        setPhotos((p) => ({ ...p, [top.id]: dataUrl }));
-        void putCatchPhoto(top.id, dataUrl);
+        // Keep the photo aligned with `bestScore`: only replace it when this
+        // identification beats every earlier one (a re-catch at lower
+        // confidence shouldn't overwrite your best shot).
+        if (r.isBest) {
+          const caughtId = top.id;
+          void (async () => {
+            const thumb = await makeThumbnail(dataUrl);
+            const photo: CatchPhoto = { full: dataUrl, thumb };
+            setPhotos((p) => ({ ...p, [caughtId]: photo }));
+            await putCatchPhoto(caughtId, photo);
+          })();
+        }
       }
       setScan({ photo: dataUrl, result, isNew });
       if (!top || top.score < LOW_CONFIDENCE) {
         setAnnounce("Not sure about this one. Try a clearer shot of the sky.");
       } else if (!isCollectible(top.id)) {
         setAnnounce(
-          "That's a contrail — a jet's condensation trail, not a cloud genus.",
+          "That's a contrail — a jet's condensation trail, not one of the 10 cloud genera.",
         );
       } else {
         const name = GENUS_BY_ID[top.id]?.name ?? top.id;
@@ -154,6 +191,7 @@ export default function App() {
               busy={busy}
               error={scanError}
               modelLoading={modelStatus === "loading"}
+              slow={slowScan}
               demo={demoModel}
               focusOnMount={everScanned}
             />

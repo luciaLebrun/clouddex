@@ -8,6 +8,9 @@ type Props = Readonly<{
   error?: string | null;
   /** True while the model chunk is still downloading / warming up. */
   modelLoading?: boolean;
+  /** True once a scan has run long enough to warrant reassurance (parent owns
+   *  the timer and the screen-reader announcement; this is visual only). */
+  slow?: boolean;
   /** True when no real model loaded and identifications are sample data. */
   demo?: boolean;
   /** Focus the shutter on mount (set when returning from a result). */
@@ -25,9 +28,6 @@ type Props = Readonly<{
  * ~500px and the classifier resizes to 224px, so cap the longest edge here.
  */
 const MAX_PHOTO_DIM = 1280;
-
-/** After this long in the busy state, reassure the user it's still working. */
-const SLOW_SCAN_MS = 8000;
 
 function downscale(
   img: HTMLImageElement,
@@ -60,29 +60,18 @@ export default function CameraCapture({
   busy,
   error,
   modelLoading,
+  slow,
   demo,
   focusOnMount,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const shutterRef = useRef<HTMLButtonElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [slow, setSlow] = useState(false);
   const shownError = localError ?? error;
 
   useEffect(() => {
     if (focusOnMount) shutterRef.current?.focus();
   }, [focusOnMount]);
-
-  // A long wait is almost always the one-time model download + warmup on the
-  // first scan of a session. Surface a reassurance rather than a silent spin.
-  useEffect(() => {
-    if (!busy) {
-      setSlow(false);
-      return;
-    }
-    const t = setTimeout(() => setSlow(true), SLOW_SCAN_MS);
-    return () => clearTimeout(t);
-  }, [busy]);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     setLocalError(null);
@@ -133,7 +122,7 @@ export default function CameraCapture({
         Point at the clouds and snap a photo — or pick one from your gallery.
       </p>
       {slow && (
-        <p className="capture-note" role="status">
+        <p className="capture-note">
           Still working — the first scan of a session takes a little longer while
           the field guide loads.
         </p>
