@@ -303,8 +303,10 @@ body {
   flex-shrink: 0;
 }
 
+/* Sits just above the photo — pull it in so it reads as a caption on the
+   result, not as an evenly-spaced item in the stack. */
 .result-revisit {
-  margin: 0;
+  margin: 0 0 -8px;
 }
 
 /* WMO abbreviation + altitude band. Not italic: the Latin genus name is

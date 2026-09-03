@@ -6,6 +6,7 @@ import {
   type Genus,
 } from "../data/genera";
 import type { Collection } from "../store/collection";
+import type { CatchPhoto } from "../store/photos";
 import GenusDetail from "./GenusDetail";
 import {
   HighCloudGlyph,
@@ -16,8 +17,8 @@ import {
 
 type Props = Readonly<{
   collection: Collection;
-  /** id -> data URL of the user's own catch photo, when they have one. */
-  photos: Record<string, string>;
+  /** id -> the user's own catch photo (grid uses the thumb), when they have one. */
+  photos: Record<string, CatchPhoto>;
   onGoScan: () => void;
 }>;
 
@@ -30,15 +31,17 @@ const ALTITUDE_GLYPH: Record<AltitudeBand, typeof HighCloudGlyph> = {
   vertical: ToweringCloudGlyph,
 };
 
-/** The photo shown for a caught cell: the user's own shot first, the reference
- *  image as a fallback (older catches, or storage unavailable). */
+/** The photo shown for a caught cell: the user's own shot (grid thumbnail)
+ *  first, the reference image as a fallback (older catches, or storage
+ *  unavailable). */
 function cellPhoto(
   genus: Genus,
   caught: boolean,
-  photos: Record<string, string>,
+  photos: Record<string, CatchPhoto>,
 ): string | null {
   if (!caught) return null;
-  if (photos[genus.id]) return photos[genus.id];
+  const own = photos[genus.id];
+  if (own) return own.thumb;
   return genus.image ? assetUrl(genus.image) : null;
 }
 
@@ -59,12 +62,12 @@ export default function Clouddex({ collection, photos, onGoScan }: Props) {
       {caughtCount === 0 && (
         <div className="dex-empty">
           <p>
-            Your field guide is empty. Photograph the sky and a confident
-            identification pins that genus here — your own photo, kept on this
-            device.
+            Photograph the sky to fill your first slot — a confident
+            identification pins that genus here, with your own photo, kept on
+            this device.
           </p>
           <button type="button" className="linklike" onClick={onGoScan}>
-            Open the camera
+            Start scanning
           </button>
         </div>
       )}
@@ -102,7 +105,7 @@ export default function Clouddex({ collection, photos, onGoScan }: Props) {
         <GenusDetail
           genus={open}
           caught={collection[open.id]}
-          photo={photos[open.id]}
+          photo={photos[open.id]?.full}
           onClose={() => setOpenId(null)}
         />
       )}

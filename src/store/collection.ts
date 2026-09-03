@@ -29,21 +29,24 @@ function save(c: Collection) {
 }
 
 /**
- * Record a successful catch. Returns the updated collection and whether this
- * was a brand-new genus (so the UI can celebrate a first catch).
+ * Record a successful catch. Returns the updated collection, whether this was a
+ * brand-new genus (so the UI can celebrate a first catch), and whether this
+ * identification is the best one seen for that genus (so the stored catch photo
+ * can track `bestScore` instead of last-write-wins).
  */
 export function recordCatch(
   id: string,
   score: number,
-): { collection: Collection; isNew: boolean } {
+): { collection: Collection; isNew: boolean; isBest: boolean } {
   const c = loadCollection();
   const existing = c[id];
   const isNew = !existing;
+  const isBest = isNew || score > existing.bestScore;
   c[id] = {
     id,
     caughtAt: existing?.caughtAt ?? Date.now(),
     bestScore: Math.max(existing?.bestScore ?? 0, score),
   };
   save(c);
-  return { collection: c, isNew };
+  return { collection: c, isNew, isBest };
 }
